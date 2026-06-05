@@ -6,391 +6,309 @@ import {
   Clock,
   User,
   CheckCircle,
-  PlayCircle,
+  XCircle,
   Camera,
   Navigation,
   Filter,
   ChevronDown,
-  X,
-  Image,
-  Check
+  Search,
+  Phone,
+  Image
 } from 'lucide-react';
+import type { Task } from '@/types';
 
 export default function Tasks() {
-  const { tasks, updateTaskStatus } = useStore();
+  const { tasks, careWorkers, currentRole, currentWorker, updateTaskStatus, elderly } = useStore();
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedTask, setSelectedTask] = useState<typeof tasks[0] | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showDetail, setShowDetail] = useState(false);
-  const [showCheckIn, setShowCheckIn] = useState(false);
 
-  const filteredTasks = tasks.filter((t) => {
-    return filterStatus === 'all' || t.status === filterStatus;
+  const filteredTasks = tasks.filter((task) => {
+    let matchRole = true;
+    if (currentRole === 'worker' && currentWorker) {
+      matchRole = task.careWorkerId === currentWorker.id;
+    }
+    const matchSearch = task.elderlyName.includes(searchQuery) || task.serviceItems.some(s => s.includes(searchQuery));
+    const matchStatus = filterStatus === 'all' || task.status === filterStatus;
+    return matchRole && matchSearch && matchStatus;
   });
 
   const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'pending': return { text: '待开始', color: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' };
-      case 'in_progress': return { text: '进行中', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' };
-      case 'completed': return { text: '已完成', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' };
-      default: return { text: '未知', color: 'bg-gray-100 text-gray-700', dot: 'bg-gray-400' };
+      case 'pending': return { text: '待执行', color: 'bg-orange-100 text-orange-700' };
+      case 'in_progress': return { text: '进行中', color: 'bg-blue-100 text-blue-700' };
+      case 'completed': return { text: '已完成', color: 'bg-green-100 text-green-700' };
+      case 'cancelled': return { text: '已取消', color: 'bg-gray-100 text-gray-700' };
+      default: return { text: '未知', color: 'bg-gray-100 text-gray-700' };
     }
   };
 
-  const handleCheckIn = (taskId: string) => {
-    const now = new Date().toISOString();
-    updateTaskStatus(taskId, 'in_progress', now);
-    setShowCheckIn(false);
-  };
-
-  const handleCheckOut = (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (task) {
-      const now = new Date().toISOString();
-      updateTaskStatus(taskId, 'completed', task.checkInTime, now);
-    }
-    setShowDetail(false);
-  };
-
-  const openDetail = (task: typeof tasks[0]) => {
+  const openDetail = (task: Task) => {
     setSelectedTask(task);
     setShowDetail(true);
   };
 
-  const pendingTasks = filteredTasks.filter((t) => t.status === 'pending');
-  const inProgressTasks = filteredTasks.filter((t) => t.status === 'in_progress');
-  const completedTasks = filteredTasks.filter((t) => t.status === 'completed');
+  const handleCheckIn = (taskId: string) => {
+    updateTaskStatus(taskId, 'in_progress', new Date().toISOString());
+    if (selectedTask?.id === taskId) {
+      setSelectedTask({ ...selectedTask, status: 'in_progress', checkInTime: new Date().toISOString() });
+    }
+  };
+
+  const handleCheckOut = (taskId: string) => {
+    updateTaskStatus(taskId, 'completed', undefined, new Date().toISOString());
+    if (selectedTask?.id === taskId) {
+      setSelectedTask({ ...selectedTask, status: 'completed', checkOutTime: new Date().toISOString() });
+    }
+  };
+
+  const canCheckIn = (task: Task) => task.status === 'pending';
+  const canCheckOut = (task: Task) => task.status === 'in_progress';
+
+  const canManage = currentRole === 'admin';
+  const canOperate = currentRole === 'admin' || currentRole === 'worker';
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">上门任务</h1>
-          <p className="text-gray-500 mt-1">管理护理员的上门服务任务和签到</p>
-        </div>
-        <div className="flex gap-3">
-          <div className="relative">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="appearance-none pl-4 pr-10 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="all">全部状态</option>
-              <option value="pending">待开始</option>
-              <option value="in_progress">进行中</option>
-              <option value="completed">已完成</option>
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-800">待开始</h3>
-            <span className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-bold text-gray-600">
-              {pendingTasks.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {pendingTasks.map((task) => {
-              const statusInfo = getStatusInfo(task.status);
-              return (
-                <div
-                  key={task.id}
-                  onClick={() => openDetail(task)}
-                  className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 cursor-pointer transition-colors border-l-4 border-gray-400"
-                >
-                  <div className="flex items-start gap-3">
-                    <img src={task.elderlyAvatar} alt={task.elderlyName} className="w-10 h-10 rounded-full object-cover" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-800">{task.elderlyName}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1 truncate flex items-center gap-1">
-                        <MapPin className="w-3 h-3 flex-shrink-0" />
-                        {task.elderlyAddress.slice(0, 15)}...
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-800">进行中</h3>
-            <span className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-sm font-bold text-orange-600">
-              {inProgressTasks.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {inProgressTasks.map((task) => {
-              return (
-                <div
-                  key={task.id}
-                  onClick={() => openDetail(task)}
-                  className="p-4 bg-orange-50 rounded-xl hover:bg-orange-100 cursor-pointer transition-colors border-l-4 border-orange-500"
-                >
-                  <div className="flex items-start gap-3">
-                    <img src={task.elderlyAvatar} alt={task.elderlyName} className="w-10 h-10 rounded-full object-cover" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-800">{task.elderlyName}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        签到时间: {task.checkInTime && new Date(task.checkInTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      <p className="text-xs text-orange-600 mt-1">
-                        护理员: {task.careWorkerName}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-800">已完成</h3>
-            <span className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-sm font-bold text-green-600">
-              {completedTasks.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {completedTasks.map((task) => {
-              return (
-                <div
-                  key={task.id}
-                  onClick={() => openDetail(task)}
-                  className="p-4 bg-green-50 rounded-xl hover:bg-green-100 cursor-pointer transition-colors border-l-4 border-green-500"
-                >
-                  <div className="flex items-start gap-3">
-                    <img src={task.elderlyAvatar} alt={task.elderlyName} className="w-10 h-10 rounded-full object-cover" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-800">{task.elderlyName}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                        <Check className="w-3 h-3 text-green-500" />
-                        完成时间: {task.checkOutTime && new Date(task.checkOutTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        服务照片: {task.photos.length}张
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <p className="text-gray-500 mt-1">查看和管理护理员上门服务任务</p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <h3 className="font-semibold text-gray-800 mb-4">任务列表</h3>
-        <div className="space-y-3">
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="搜索老人姓名、服务项目..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="relative">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="appearance-none pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">全部状态</option>
+                <option value="pending">待执行</option>
+                <option value="in_progress">进行中</option>
+                <option value="completed">已完成</option>
+                <option value="cancelled">已取消</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
+            <button className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
+              <Filter className="w-5 h-5 text-gray-600" />
+              <span className="text-gray-600">筛选</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTasks.map((task) => {
             const statusInfo = getStatusInfo(task.status);
             return (
               <div
                 key={task.id}
-                className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                className="border border-gray-100 rounded-2xl p-5 hover:shadow-lg transition-all cursor-pointer hover:border-teal-200"
+                onClick={() => openDetail(task)}
               >
-                <div className={`w-3 h-3 rounded-full ${statusInfo.dot}`} />
-                <img src={task.elderlyAvatar} alt={task.elderlyName} className="w-12 h-12 rounded-xl object-cover" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-gray-800">{task.elderlyName}</h4>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.color}`}>
-                      {statusInfo.text}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    {task.elderlyAddress}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {task.serviceItems.slice(0, 3).map((item) => (
-                      <span key={item} className="text-xs px-2 py-1 bg-white rounded-lg text-gray-600 border border-gray-200">
-                        {item}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center">
+                      <ClipboardList className="w-6 h-6 text-teal-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-800">{task.elderlyName}</h3>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                        {statusInfo.text}
                       </span>
-                    ))}
+                    </div>
+                  </div>
+                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <Navigation className="w-5 h-5 text-teal-600" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <span className="truncate">{task.elderlyAddress}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <span>{task.scheduledTime}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <span>{task.careWorkerName}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-700">
-                    {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  <p className="text-xs text-gray-500">护理员: {task.careWorkerName}</p>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {task.serviceItems.slice(0, 3).map((item, index) => (
+                    <span key={index} className="px-2 py-1 bg-teal-50 text-teal-700 text-xs rounded-lg">
+                      {item}
+                    </span>
+                  ))}
+                  {task.serviceItems.length > 3 && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg">
+                      +{task.serviceItems.length - 3}
+                    </span>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  {task.status === 'pending' && (
-                    <>
+
+                {canOperate && (
+                  <div className="flex gap-2 pt-4 border-t border-gray-100">
+                    {canCheckIn(task) && (
                       <button
-                        onClick={() => { setSelectedTask(task); setShowCheckIn(true); }}
-                        className="flex items-center gap-1 px-4 py-2 bg-teal-600 text-white text-sm rounded-xl hover:bg-teal-700 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleCheckIn(task.id); }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors text-sm font-medium"
                       >
-                        <Navigation className="w-4 h-4" />
+                        <CheckCircle className="w-4 h-4" />
                         签到
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors">
-                        <MapPin className="w-5 h-5" />
+                    )}
+                    {canCheckOut(task) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleCheckOut(task.id); }}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        完成
                       </button>
-                    </>
-                  )}
-                  {task.status === 'in_progress' && (
+                    )}
                     <button
-                      onClick={() => handleCheckOut(task.id)}
-                      className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm rounded-xl hover:bg-green-700 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); openDetail(task); }}
+                      className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium"
                     >
-                      <CheckCircle className="w-4 h-4" />
-                      完成服务
+                      详情
                     </button>
-                  )}
-                  {task.status === 'completed' && (
-                    <button
-                      onClick={() => openDetail(task)}
-                      className="flex items-center gap-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      <Image className="w-4 h-4" />
-                      查看
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-      </div>
 
-      {showCheckIn && selectedTask && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-800">到场签到</h2>
-              <button onClick={() => setShowCheckIn(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="text-center mb-6">
-                <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Navigation className="w-10 h-10 text-teal-600" />
-                </div>
-                <h3 className="font-semibold text-gray-800 text-lg">{selectedTask.elderlyName}</h3>
-                <p className="text-gray-500 mt-1">{selectedTask.elderlyAddress}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <MapPin className="w-5 h-5 text-teal-600" />
-                  <div>
-                    <p className="text-sm text-gray-500">GPS定位</p>
-                    <p className="font-medium text-gray-800">已定位到服务地点</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-teal-600" />
-                  <div>
-                    <p className="text-sm text-gray-500">当前时间</p>
-                    <p className="font-medium text-gray-800">{new Date().toLocaleString('zh-CN')}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCheckIn(false)}
-                  className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => handleCheckIn(selectedTask.id)}
-                  className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium"
-                >
-                  确认签到
-                </button>
-              </div>
-            </div>
+        {filteredTasks.length === 0 && (
+          <div className="text-center py-12">
+            <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">暂无任务数据</p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {showDetail && selectedTask && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="bg-gradient-to-r from-teal-600 to-teal-700 p-6 text-white">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-4">
-                  <img src={selectedTask.elderlyAvatar} alt={selectedTask.elderlyName} className="w-16 h-16 rounded-2xl object-cover border-4 border-white/30" />
-                  <div>
-                    <h2 className="text-xl font-bold">{selectedTask.elderlyName}</h2>
-                    <p className="text-teal-100 mt-1 flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {selectedTask.elderlyAddress}
-                    </p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">任务详情</h2>
+                  <p className="text-teal-100 mt-1">{selectedTask.elderlyName}</p>
                 </div>
                 <button onClick={() => setShowDetail(false)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
-                  <X className="w-6 h-6" />
+                  <XCircle className="w-6 h-6" />
                 </button>
               </div>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-sm text-gray-500">护理员</p>
-                  <p className="font-medium text-gray-800 mt-1">{selectedTask.careWorkerName}</p>
+                  <p className="font-semibold text-gray-800 mt-1">{selectedTask.careWorkerName}</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <p className="text-sm text-gray-500">预约时间</p>
-                  <p className="font-medium text-gray-800 mt-1">
-                    {new Date(selectedTask.scheduledTime).toLocaleString('zh-CN')}
-                  </p>
+                  <p className="text-sm text-gray-500">服务时间</p>
+                  <p className="font-semibold text-gray-800 mt-1">{selectedTask.scheduledTime}</p>
                 </div>
-                {selectedTask.checkInTime && (
-                  <div className="bg-green-50 rounded-xl p-4">
-                    <p className="text-sm text-gray-500">签到时间</p>
-                    <p className="font-medium text-green-700 mt-1">
-                      {new Date(selectedTask.checkInTime).toLocaleString('zh-CN')}
-                    </p>
-                  </div>
-                )}
-                {selectedTask.checkOutTime && (
-                  <div className="bg-blue-50 rounded-xl p-4">
-                    <p className="text-sm text-gray-500">签退时间</p>
-                    <p className="font-medium text-blue-700 mt-1">
-                      {new Date(selectedTask.checkOutTime).toLocaleString('zh-CN')}
-                    </p>
-                  </div>
-                )}
               </div>
 
               <div className="mb-6">
-                <h3 className="font-semibold text-gray-800 mb-3">服务项目</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedTask.serviceItems.map((item) => (
-                    <span key={item} className="px-4 py-2 bg-teal-50 text-teal-700 rounded-xl text-sm font-medium">
-                      {item}
-                    </span>
+                <p className="text-sm font-medium text-gray-700 mb-2">服务地址</p>
+                <div className="flex items-start gap-2 bg-gray-50 rounded-xl p-4">
+                  <MapPin className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-700">{selectedTask.elderlyAddress}</span>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-3">服务项目</p>
+                <div className="space-y-2">
+                  {selectedTask.serviceItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-teal-50 rounded-xl">
+                      <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                        {index + 1}
+                      </div>
+                      <span className="text-teal-800">{item}</span>
+                    </div>
                   ))}
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-500">签到时间</p>
+                  <p className="font-semibold text-gray-800 mt-1">
+                    {selectedTask.checkInTime ? new Date(selectedTask.checkInTime).toLocaleString('zh-CN') : '未签到'}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm text-gray-500">完成时间</p>
+                  <p className="font-semibold text-gray-800 mt-1">
+                    {selectedTask.checkOutTime ? new Date(selectedTask.checkOutTime).toLocaleString('zh-CN') : '未完成'}
+                  </p>
+                </div>
+              </div>
+
               {selectedTask.photos.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <Camera className="w-5 h-5 text-teal-600" />
-                    服务照片
-                  </h3>
+                <div className="mb-6">
+                  <p className="text-sm font-medium text-gray-700 mb-3">服务照片</p>
                   <div className="grid grid-cols-3 gap-3">
                     {selectedTask.photos.map((photo, index) => (
-                      <img key={index} src={photo} alt={`服务照片${index + 1}`} className="w-full aspect-square object-cover rounded-xl" />
+                      <div key={index} className="aspect-square bg-gray-100 rounded-xl overflow-hidden">
+                        <Image className="w-full h-full object-cover" />
+                      </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {canOperate && (
+                <div className="flex gap-3">
+                  {canCheckIn(selectedTask) && (
+                    <button
+                      onClick={() => handleCheckIn(selectedTask.id)}
+                      className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      签到开始
+                    </button>
+                  )}
+                  {canCheckOut(selectedTask) && (
+                    <button
+                      onClick={() => handleCheckOut(selectedTask.id)}
+                      className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+                    >
+                      <Camera className="w-5 h-5" />
+                      完成服务
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowDetail(false)}
+                    className="px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    关闭
+                  </button>
                 </div>
               )}
             </div>

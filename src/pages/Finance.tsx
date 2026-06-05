@@ -13,15 +13,27 @@ import {
   Download,
   DollarSign,
   TrendingUp,
-  Receipt
+  Receipt,
+  Plus,
+  Check,
+  Calendar
 } from 'lucide-react';
+import type { Bill, BillItem } from '@/types';
 
 export default function Finance() {
-  const { bills, elderly, updateBillStatus } = useStore();
+  const { bills, elderly, servicePackages, appointments, updateBillStatus, addBill, currentRole } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedBill, setSelectedBill] = useState<typeof bills[0] | null>(null);
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateForm, setGenerateForm] = useState({
+    elderlyId: '',
+    month: new Date().toISOString().slice(0, 7),
+    servicePackageIds: [] as string[]
+  });
+
+  const canManage = currentRole === 'admin';
 
   const filteredBills = bills.filter((b) => {
     const matchSearch = b.elderlyName.includes(searchQuery);
@@ -29,10 +41,10 @@ export default function Finance() {
     return matchSearch && matchStatus;
   });
 
-  const totalAmount = bills.reduce((sum, b) => sum + b.totalAmount, 0);
-  const totalSubsidy = bills.reduce((sum, b) => sum + b.subsidyAmount, 0);
-  const totalActual = bills.reduce((sum, b) => sum + b.actualAmount, 0);
-  const unpaidCount = bills.filter((b) => b.status === 'unpaid').length;
+  const totalAmount = filteredBills.reduce((sum, b) => sum + b.totalAmount, 0);
+  const totalSubsidy = filteredBills.reduce((sum, b) => sum + b.subsidyAmount, 0);
+  const totalActual = filteredBills.reduce((sum, b) => sum + b.actualAmount, 0);
+  const unpaidCount = filteredBills.filter((b) => b.status === 'unpaid').length;
 
   const getStatusInfo = (status: string) => {
     switch (status) {
@@ -43,15 +55,126 @@ export default function Finance() {
     }
   };
 
-  const openDetail = (bill: typeof bills[0]) => {
+  const openDetail = (bill: Bill) => {
     setSelectedBill(bill);
     setShowDetail(true);
   };
 
   const handlePay = (billId: string) => {
     updateBillStatus(billId, 'paid');
-    setShowDetail(false);
+    if (selectedBill?.id === billId) {
+      setSelectedBill({ ...selectedBill, status: 'paid', paidTime: new Date().toISOString() });
+    }
   };
+
+  const calculatePreview = () => {
+    let total = 0;
+    let subsidy = 0;
+    const items: BillItem[] = [];
+
+    generateForm.servicePackageIds.forEach((pkgId) => {
+      const pkg = servicePackages.find((p) => p.id === pkgId);
+      if (pkg) {
+        const item: BillItem = {
+          id: `bi${Date.now()}-${pkgId}`,
+          name: pkg.name,
+          quantity: 1,
+          unitPrice: pkg.price,
+          amount: pkg.price,
+          subsidyAmount: pkg.price - pkg.subsidyPrice
+        };
+        items.push(item);
+        total += pkg.price;
+        subsidy += pkg.price - pkg.subsidyPrice;
+      }
+    });
+
+    return { total, subsidy, actual: total - subsidy, items };
+  };
+
+  const handleGenerateBill = () => {
+    if (!generateForm.elderlyId || !generateForm.month || generateForm.servicePackageIds.length === 0) return;
+
+    const elder = elderly.find((e) => e.id === generateForm.elderlyId);
+    if (!elder) return;
+
+    const { total, subsidy, actual, items } = calculatePreview();
+
+    const newBill: Bill = {
+      id: `b${Date.now()}`,
+      elderlyId: generateForm.elderlyId,
+      elderlyName: elder.name,
+      month: generateForm.month,
+      totalAmount: total,
+      subsidyAmount: subsidy,
+      actualAmount: actual,
+      status: 'unpaid',
+      items,
+      createTime: new Date().toISOString()
+    };
+
+    addBill(newBill);
+    setShowGenerateModal(false);
+    setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), servicePackageIds: [] });
+  };
+
+  const handleDownload = (bill: Bill) => {
+    const content = `
+=====================================
+        社区养老服务账单
+=====================================
+
+账单编号：${bill.id}
+老人姓名：${bill.elderlyName}
+账单月份：${bill.month}
+生成时间：${new Date(bill.createTime).toLocaleString('zh-CN')}
+${bill.paidTime ? `支付时间：${new Date(bill.paidTime).toLocaleString('zh-CN')}` : ''}
+
+-------------------------------------
+             费用明细
+-------------------------------------
+${bill.items.map((item, i) => `
+${i + 1}. ${item.name}
+   单价：¥${item.unitPrice.toLocaleString()}
+   数量：${item.quantity}
+   金额：¥${item.amount.toLocaleString()}
+   补贴：¥${item.subsidyAmount.toLocaleString()}
+`).join('')}
+-------------------------------------
+             费用汇总
+-------------------------------------
+总金额：    ¥${bill.totalAmount.toLocaleString()}
+政府补贴： -¥${bill.subsidyAmount.toLocaleString()}
+实付金额：  ¥${bill.actualAmount.toLocaleString()}
+
+账单状态：${getStatusInfo(bill.status).text}
+
+=====================================
+    感谢使用社区养老服务平台
+=====================================
+    `.trim();
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `账单_${bill.elderlyName}_${bill.month}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleServicePackage = (pkgId: string) => {
+    setGenerateForm(prev => ({
+      ...prev,
+      servicePackageIds: prev.servicePackageIds.includes(pkgId)
+        ? prev.servicePackageIds.filter(id => id !== pkgId)
+        : [...prev.servicePackageIds, pkgId]
+    }));
+  };
+
+  const preview = generateForm.servicePackageIds.length > 0 ? calculatePreview() : null;
 
   return (
     <div className="space-y-6">
@@ -60,10 +183,15 @@ export default function Finance() {
           <h1 className="text-2xl font-bold text-gray-800">费用补贴</h1>
           <p className="text-gray-500 mt-1">管理老人的费用账单和补贴核算</p>
         </div>
-        <button className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md hover:shadow-lg">
-          <Receipt className="w-5 h-5" />
-          生成账单
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md hover:shadow-lg"
+          >
+            <Receipt className="w-5 h-5" />
+            生成账单
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -202,7 +330,11 @@ export default function Finance() {
                             支付
                           </button>
                         )}
-                        <button className="text-gray-500 hover:text-gray-700 text-sm">
+                        <button
+                          onClick={() => handleDownload(bill)}
+                          className="text-gray-500 hover:text-gray-700 text-sm"
+                          title="下载账单"
+                        >
                           <Download className="w-4 h-4" />
                         </button>
                       </div>
@@ -274,14 +406,21 @@ export default function Finance() {
                 )}
               </div>
 
-              {selectedBill.status === 'unpaid' && (
-                <div className="mt-6 flex gap-3">
-                  <button
-                    onClick={() => setShowDetail(false)}
-                    className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
-                  >
-                    取消
-                  </button>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setShowDetail(false)}
+                  className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                >
+                  关闭
+                </button>
+                <button
+                  onClick={() => handleDownload(selectedBill)}
+                  className="px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  下载
+                </button>
+                {selectedBill.status === 'unpaid' && (
                   <button
                     onClick={() => handlePay(selectedBill.id)}
                     className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium flex items-center justify-center gap-2"
@@ -289,8 +428,121 @@ export default function Finance() {
                     <CreditCard className="w-5 h-5" />
                     立即支付
                   </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-r from-teal-600 to-teal-700 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">生成账单</h2>
+                <button
+                  onClick={() => { setShowGenerateModal(false); setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), servicePackageIds: [] }); }}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-180px)]">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">选择老人</label>
+                  <select
+                    value={generateForm.elderlyId}
+                    onChange={(e) => setGenerateForm({ ...generateForm, elderlyId: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">请选择老人</option>
+                    {elderly.map((e) => (
+                      <option key={e.id} value={e.id}>{e.name} - {e.age}岁</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">账单月份</label>
+                  <input
+                    type="month"
+                    value={generateForm.month}
+                    onChange={(e) => setGenerateForm({ ...generateForm, month: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">选择服务项目</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {servicePackages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      onClick={() => toggleServicePackage(pkg.id)}
+                      className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                        generateForm.servicePackageIds.includes(pkg.id)
+                          ? 'border-teal-500 bg-teal-50'
+                          : 'border-gray-100 hover:border-teal-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-gray-800">{pkg.name}</p>
+                          <p className="text-xs text-gray-500 mt-1">{pkg.duration}</p>
+                        </div>
+                        {generateForm.servicePackageIds.includes(pkg.id) && (
+                          <div className="w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-lg font-bold text-teal-600">¥{pkg.subsidyPrice}</span>
+                        <span className="text-xs text-gray-400 line-through">¥{pkg.price}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {preview && (
+                <div className="bg-gray-50 rounded-xl p-5">
+                  <h4 className="font-semibold text-gray-800 mb-3">费用预览</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <p className="text-sm text-gray-500">总金额</p>
+                      <p className="text-xl font-bold text-gray-800 mt-1">¥{preview.total.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-blue-600">补贴</p>
+                      <p className="text-xl font-bold text-blue-700 mt-1">-¥{preview.subsidy.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-orange-600">实付</p>
+                      <p className="text-xl font-bold text-orange-700 mt-1">¥{preview.actual.toLocaleString()}</p>
+                    </div>
+                  </div>
                 </div>
               )}
+            </div>
+            <div className="flex gap-3 p-6 border-t border-gray-100">
+              <button
+                onClick={() => { setShowGenerateModal(false); setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), servicePackageIds: [] }); }}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleGenerateBill}
+                disabled={!generateForm.elderlyId || !generateForm.month || generateForm.servicePackageIds.length === 0}
+                className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-5 h-5" />
+                生成账单
+              </button>
             </div>
           </div>
         </div>

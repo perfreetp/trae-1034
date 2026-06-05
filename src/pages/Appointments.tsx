@@ -15,14 +15,35 @@ import {
   X,
   Calendar,
   Phone,
-  MapPin
+  MapPin,
+  AlertTriangle,
+  Check,
+  Star,
+  ListTodo
 } from 'lucide-react';
+import type { Appointment } from '@/types';
 
 export default function Appointments() {
-  const { appointments, servicePackages, elderly, careWorkers, addAppointment } = useStore();
+  const {
+    appointments,
+    servicePackages,
+    elderly,
+    careWorkers,
+    addAppointment,
+    confirmAppointment,
+    updateAppointmentStatus,
+    createTaskFromAppointment,
+    currentRole
+  } = useStore();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showCareWorkerModal, setShowCareWorkerModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [selectedCareWorkerId, setSelectedCareWorkerId] = useState<string>('');
+  
   const [newAppointment, setNewAppointment] = useState({
     elderlyId: '',
     servicePackageId: '',
@@ -71,6 +92,40 @@ export default function Appointments() {
     setNewAppointment({ elderlyId: '', servicePackageId: '', scheduledTime: '', notes: '' });
   };
 
+  const handleConfirmClick = (appointmentId: string) => {
+    setSelectedAppointmentId(appointmentId);
+    setSelectedCareWorkerId('');
+    setShowCareWorkerModal(true);
+  };
+
+  const handleConfirmAppointment = () => {
+    if (!selectedAppointmentId || !selectedCareWorkerId) return;
+    const worker = careWorkers.find((w) => w.id === selectedCareWorkerId);
+    if (!worker) return;
+    confirmAppointment(selectedAppointmentId, worker.id, worker.name);
+    setShowCareWorkerModal(false);
+    setSelectedAppointmentId(null);
+    setSelectedCareWorkerId('');
+  };
+
+  const handleCancelClick = (appointmentId: string) => {
+    setSelectedAppointmentId(appointmentId);
+    setShowCancelModal(true);
+  };
+
+  const handleCancelAppointment = () => {
+    if (!selectedAppointmentId) return;
+    updateAppointmentStatus(selectedAppointmentId, 'cancelled');
+    setShowCancelModal(false);
+    setSelectedAppointmentId(null);
+  };
+
+  const handleCreateTask = (appointmentId: string) => {
+    createTaskFromAppointment(appointmentId);
+  };
+
+  const canManage = currentRole === 'admin';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -78,13 +133,15 @@ export default function Appointments() {
           <h1 className="text-2xl font-bold text-gray-800">服务预约</h1>
           <p className="text-gray-500 mt-1">管理老人的服务预约和套餐选择</p>
         </div>
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md hover:shadow-lg"
-        >
-          <Plus className="w-5 h-5" />
-          新建预约
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors shadow-md hover:shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            新建预约
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -198,18 +255,48 @@ export default function Appointments() {
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <div className="flex gap-2">
-                        {a.status === 'pending' && (
+                      <div className="flex gap-3">
+                        {canManage && a.status === 'pending' && (
                           <>
-                            <button className="text-teal-600 hover:text-teal-700 text-sm font-medium">确认</button>
-                            <button className="text-red-500 hover:text-red-600 text-sm">取消</button>
+                            <button
+                              onClick={() => handleConfirmClick(a.id)}
+                              className="text-teal-600 hover:text-teal-700 text-sm font-medium flex items-center gap-1"
+                            >
+                              <Check className="w-4 h-4" />
+                              确认
+                            </button>
+                            <button
+                              onClick={() => handleCancelClick(a.id)}
+                              className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              取消
+                            </button>
                           </>
                         )}
-                        {a.status === 'confirmed' && (
-                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">查看详情</button>
+                        {canManage && a.status === 'confirmed' && (
+                          <>
+                            <button
+                              onClick={() => handleCreateTask(a.id)}
+                              className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
+                            >
+                              <ListTodo className="w-4 h-4" />
+                              生成任务
+                            </button>
+                            <button
+                              onClick={() => handleCancelClick(a.id)}
+                              className="text-red-500 hover:text-red-600 text-sm flex items-center gap-1"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              取消
+                            </button>
+                          </>
                         )}
                         {a.status === 'completed' && (
-                          <button className="text-green-600 hover:text-green-700 text-sm font-medium">服务记录</button>
+                          <span className="text-green-600 text-sm font-medium">服务已完成</span>
+                        )}
+                        {a.status === 'cancelled' && (
+                          <span className="text-gray-400 text-sm">已取消</span>
                         )}
                       </div>
                     </td>
@@ -289,6 +376,110 @@ export default function Appointments() {
                 className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium"
               >
                 确认预约
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCareWorkerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-800">选择护理员</h2>
+              <button onClick={() => { setShowCareWorkerModal(false); setSelectedAppointmentId(null); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
+              {careWorkers.map((worker) => (
+                <div
+                  key={worker.id}
+                  onClick={() => setSelectedCareWorkerId(worker.id)}
+                  className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                    selectedCareWorkerId === worker.id
+                      ? 'border-teal-500 bg-teal-50'
+                      : 'border-gray-100 hover:border-teal-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <img src={worker.avatar} alt={worker.name} className="w-12 h-12 rounded-xl object-cover" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-800">{worker.name}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          worker.status === 'on-duty' ? 'bg-green-100 text-green-700' :
+                          worker.status === 'busy' ? 'bg-orange-100 text-orange-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {worker.status === 'on-duty' ? '在岗' : worker.status === 'busy' ? '忙碌' : '休息'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">{worker.gender === 'female' ? '女' : '男'} · {worker.age}岁</p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-1 text-yellow-500">
+                          <Star className="w-4 h-4 fill-yellow-500" />
+                          <span className="text-sm">{worker.rating}</span>
+                        </div>
+                        <span className="text-xs text-gray-400">完成 {worker.completedTasks} 单</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {worker.skills.slice(0, 3).map((s) => (
+                          <span key={s} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {selectedCareWorkerId === worker.id && (
+                      <div className="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center">
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 p-6 border-t border-gray-100">
+              <button
+                onClick={() => { setShowCareWorkerModal(false); setSelectedAppointmentId(null); }}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmAppointment}
+                disabled={!selectedCareWorkerId}
+                className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                确认分配
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-orange-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">确认取消预约</h3>
+              <p className="text-gray-500 mb-6">确定要取消这个预约吗？取消后需要重新预约。</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowCancelModal(false); setSelectedAppointmentId(null); }}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              >
+                再想想
+              </button>
+              <button
+                onClick={handleCancelAppointment}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <XCircle className="w-5 h-5" />
+                确认取消
               </button>
             </div>
           </div>
