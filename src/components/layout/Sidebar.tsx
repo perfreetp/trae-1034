@@ -18,11 +18,11 @@ type Role = 'admin' | 'worker' | 'family';
 
 const allNavItems = [
   { path: '/', label: '运营看板', icon: LayoutDashboard, roles: ['admin'] as Role[] },
-  { path: '/elderly', label: '老人档案', icon: Users, roles: ['admin', 'worker', 'family'] as Role[] },
-  { path: '/appointments', label: '服务预约', icon: CalendarClock, roles: ['admin', 'worker'] as Role[] },
+  { path: '/elderly', label: '老人档案', icon: Users, roles: ['admin', 'family'] as Role[] },
+  { path: '/appointments', label: '服务预约', icon: CalendarClock, roles: ['admin'] as Role[] },
   { path: '/tasks', label: '上门任务', icon: ClipboardList, roles: ['admin', 'worker'] as Role[] },
-  { path: '/health', label: '健康记录', icon: Heart, roles: ['admin', 'worker', 'family'] as Role[] },
-  { path: '/contacts', label: '紧急联系人', icon: Phone, roles: ['admin', 'worker', 'family'] as Role[] },
+  { path: '/health', label: '健康记录', icon: Heart, roles: ['admin', 'worker'] as Role[] },
+  { path: '/contacts', label: '紧急联系人', icon: Phone, roles: ['admin'] as Role[] },
   { path: '/finance', label: '费用补贴', icon: Wallet, roles: ['admin', 'family'] as Role[] },
   { path: '/messages', label: '家属消息', icon: MessageSquare, roles: ['admin', 'family'] as Role[] }
 ];

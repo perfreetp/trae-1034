@@ -17,7 +17,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import type { HealthRecord } from '@/types';
 
 export default function Health() {
-  const { healthRecords, elderly, currentRole, currentFamily, addHealthRecord } = useStore();
+  const { healthRecords, elderly, currentRole, currentFamily, currentWorker, tasks, addHealthRecord } = useStore();
   const [selectedElderlyId, setSelectedElderlyId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -34,6 +34,9 @@ export default function Health() {
     let matchRole = true;
     if (currentRole === 'family' && currentFamily) {
       matchRole = currentFamily.authorizedElderlyIds.includes(e.id);
+    } else if (currentRole === 'worker' && currentWorker) {
+      const myTaskElderIds = [...new Set(tasks.filter(t => t.careWorkerId === currentWorker.id).map(t => t.elderlyId))];
+      matchRole = myTaskElderIds.includes(e.id);
     }
     const matchSearch = e.name.includes(searchQuery);
     return matchRole && matchSearch;

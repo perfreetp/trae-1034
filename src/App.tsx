@@ -21,12 +21,12 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/elderly" element={
-            <ProtectedRoute allowedRoles={['admin', 'worker', 'family']}>
+            <ProtectedRoute allowedRoles={['admin', 'family']}>
               <Elderly />
             </ProtectedRoute>
           } />
           <Route path="/appointments" element={
-            <ProtectedRoute allowedRoles={['admin', 'worker']}>
+            <ProtectedRoute allowedRoles={['admin']}>
               <Appointments />
             </ProtectedRoute>
           } />
@@ -36,12 +36,12 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/health" element={
-            <ProtectedRoute allowedRoles={['admin', 'worker', 'family']}>
+            <ProtectedRoute allowedRoles={['admin', 'worker']}>
               <Health />
             </ProtectedRoute>
           } />
           <Route path="/contacts" element={
-            <ProtectedRoute allowedRoles={['admin', 'worker']}>
+            <ProtectedRoute allowedRoles={['admin']}>
               <Contacts />
             </ProtectedRoute>
           } />

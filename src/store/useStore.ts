@@ -43,6 +43,7 @@ interface StoreState {
   currentFamily: { id: string; name: string; phone: string; authorizedElderlyIds: string[] } | null;
   selectedElderly: Elderly | null;
   setCurrentRole: (role: 'admin' | 'worker' | 'family') => void;
+  setCurrentWorker: (worker: CareWorker | null) => void;
   setCurrentUserId: (id: string) => void;
   setSelectedElderly: (elderly: Elderly | null) => void;
   addElderly: (elderly: Elderly) => void;
@@ -99,6 +100,11 @@ export const useStore = create<StoreState>()(
           set({ currentRole: role, currentFamily: family, currentWorker: null, currentUserId: family.id });
         } else {
           set({ currentRole: role, currentWorker: null, currentFamily: null, currentUserId: 'admin001' });
+        }
+      },
+      setCurrentWorker: (worker) => {
+        if (worker) {
+          set({ currentWorker: worker, currentUserId: worker.id });
         }
       },
       setCurrentUserId: (id) => set({ currentUserId: id }),

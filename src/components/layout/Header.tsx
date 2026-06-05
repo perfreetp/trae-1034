@@ -3,9 +3,10 @@ import { useStore } from '@/store/useStore';
 import { useState } from 'react';
 
 export function Header() {
-  const { messages, currentRole, setCurrentRole } = useStore();
+  const { messages, currentRole, careWorkers, currentWorker, currentFamily, setCurrentRole, setCurrentWorker } = useStore();
   const unreadCount = messages.filter((m) => !m.isRead).length;
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [workerDropdownOpen, setWorkerDropdownOpen] = useState(false);
 
   const roles = [
     { id: 'admin', label: '街道管理员', icon: '管' },
@@ -29,6 +30,46 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
+        {currentRole === 'worker' && careWorkers.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setWorkerDropdownOpen(!workerDropdownOpen)}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-50 hover:bg-teal-100 rounded-xl transition-colors border border-teal-200"
+            >
+              <span className="text-sm font-medium text-teal-700">
+                {currentWorker?.name || '选择护理员'}
+              </span>
+              <ChevronDown className="w-4 h-4 text-teal-600" />
+            </button>
+            {workerDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                {careWorkers.map((worker) => (
+                  <button
+                    key={worker.id}
+                    onClick={() => {
+                      setCurrentWorker(worker);
+                      setWorkerDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors ${
+                      currentWorker?.id === worker.id ? 'bg-teal-50 text-teal-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <div className="w-7 h-7 bg-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      {worker.name.charAt(0)}
+                    </div>
+                    <div className="text-left">
+                      <span className="text-sm block">{worker.name}</span>
+                      <span className="text-xs text-gray-500">
+                        {worker.status === 'on-duty' ? '在岗' : worker.status === 'busy' ? '忙碌' : '休息'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="relative">
           <button
             onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
@@ -48,6 +89,7 @@ export function Header() {
                   onClick={() => {
                     setCurrentRole(role.id);
                     setRoleDropdownOpen(false);
+                    setWorkerDropdownOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors ${
                     currentRole === role.id ? 'bg-teal-50 text-teal-700' : 'text-gray-700'
@@ -79,7 +121,11 @@ export function Header() {
             <User className="w-5 h-5 text-white" />
           </div>
           <div className="hidden md:block">
-            <p className="text-sm font-semibold text-gray-800">系统管理员</p>
+            <p className="text-sm font-semibold text-gray-800">
+              {currentRole === 'admin' ? '系统管理员' :
+               currentRole === 'worker' ? (currentWorker?.name || '护理员') :
+               (currentFamily?.name || '家属')}
+            </p>
             <p className="text-xs text-gray-500">静安区养老服务中心</p>
           </div>
         </div>

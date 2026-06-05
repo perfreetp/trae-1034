@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
 import {
   Users,
@@ -10,7 +9,6 @@ import {
   TrendingUp,
   Star,
   Cake,
-  ChevronRight,
   Activity
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -30,7 +28,6 @@ const statCards = [
 ];
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const { dashboardStats, elderly, tasks, messages } = useStore();
 
   const upcomingBirthdays = elderly.filter((e) => {
@@ -136,17 +133,11 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <Cake className="w-5 h-5 text-orange-500" />
               近期生日
             </h2>
-            <button
-              onClick={() => navigate('/elderly')}
-              className="text-teal-600 text-sm hover:underline flex items-center gap-1"
-            >
-              全部 <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
           <div className="space-y-3">
             {upcomingBirthdays.length > 0 ? upcomingBirthdays.map((e) => {
@@ -177,17 +168,11 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <Activity className="w-5 h-5 text-teal-500" />
               最新任务
             </h2>
-            <button
-              onClick={() => navigate('/tasks')}
-              className="text-teal-600 text-sm hover:underline flex items-center gap-1"
-            >
-              全部 <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
           <div className="space-y-3">
             {recentTasks.map((task) => (
@@ -212,17 +197,11 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-500" />
               风险提醒
             </h2>
-            <button
-              onClick={() => navigate('/messages')}
-              className="text-teal-600 text-sm hover:underline flex items-center gap-1"
-            >
-              全部 <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
           <div className="space-y-3">
             {unreadMessages.filter((m) => m.type === 'emergency' || m.type === 'system').map((msg) => (
