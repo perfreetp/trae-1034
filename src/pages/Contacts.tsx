@@ -71,12 +71,27 @@ export default function Contacts() {
     setShowMessageModal(true);
   };
 
+  const findFamilyIdForContact = (contact: EmergencyContact): string => {
+    const elderlyInfo = elderly.find(e => e.id === contact.elderlyId);
+    if (elderlyInfo) {
+      const familyMember = elderlyInfo.familyMembers.find(
+        fm => fm.name === contact.name && fm.phone === contact.phone
+      );
+      if (familyMember) {
+        return familyMember.id;
+      }
+    }
+    return contact.id;
+  };
+
   const handleSendMessage = () => {
     if (!selectedContact || !messageContent.trim()) return;
 
+    const recipientId = findFamilyIdForContact(selectedContact);
+
     const message = {
       id: `msg${Date.now()}`,
-      recipientId: selectedContact.id,
+      recipientId: recipientId,
       recipientType: 'family' as const,
       title: '社区养老服务中心通知',
       content: messageContent,
@@ -165,7 +180,7 @@ export default function Contacts() {
                     <img src={e.avatar} alt={e.name} className="w-10 h-10 rounded-xl object-cover" />
                     <div>
                       <p className="font-medium text-gray-800 text-sm">{e.name}</p>
-                      <p className="text-xs text-gray-500">{e.age}岁 · {contacts.length}位联系人</p>
+                      <p className="text-xs text-gray-500">{e.age}岁 · {e.emergencyContacts.length}位联系人</p>
                     </div>
                   </div>
                 </div>

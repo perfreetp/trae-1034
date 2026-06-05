@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useStore } from '@/store/useStore';
 import {
   Wallet,
   Search,
-  Filter,
   ChevronDown,
   FileText,
   CreditCard,
@@ -18,7 +17,7 @@ import {
   Check,
   Calendar
 } from 'lucide-react';
-import type { Bill, BillItem } from '@/types';
+import type { Bill, BillItem, Appointment } from '@/types';
 
 export default function Finance() {
   const { bills, elderly, servicePackages, appointments, updateBillStatus, addBill, currentRole } = useStore();
@@ -30,7 +29,7 @@ export default function Finance() {
   const [generateForm, setGenerateForm] = useState({
     elderlyId: '',
     month: new Date().toISOString().slice(0, 7),
-    servicePackageIds: [] as string[]
+    selectedAppointmentIds: [] as string[]
   });
 
   const canManage = currentRole === 'admin';
@@ -67,33 +66,47 @@ export default function Finance() {
     }
   };
 
+  const filteredAppointments = useMemo(() => {
+    if (!generateForm.elderlyId || !generateForm.month) return [];
+    
+    return appointments.filter((apt) => {
+      const matchElderly = apt.elderlyId === generateForm.elderlyId;
+      const matchMonth = apt.scheduledTime.startsWith(generateForm.month);
+      const matchStatus = apt.status === 'completed' || apt.status === 'confirmed';
+      return matchElderly && matchMonth && matchStatus;
+    });
+  }, [generateForm.elderlyId, generateForm.month, appointments]);
+
   const calculatePreview = () => {
     let total = 0;
     let subsidy = 0;
     const items: BillItem[] = [];
 
-    generateForm.servicePackageIds.forEach((pkgId) => {
-      const pkg = servicePackages.find((p) => p.id === pkgId);
-      if (pkg) {
-        const item: BillItem = {
-          id: `bi${Date.now()}-${pkgId}`,
-          name: pkg.name,
-          quantity: 1,
-          unitPrice: pkg.price,
-          amount: pkg.price,
-          subsidyAmount: pkg.price - pkg.subsidyPrice
-        };
-        items.push(item);
-        total += pkg.price;
-        subsidy += pkg.price - pkg.subsidyPrice;
-      }
+    generateForm.selectedAppointmentIds.forEach((aptId) => {
+      const apt = appointments.find((a) => a.id === aptId);
+      if (!apt) return;
+      
+      const pkg = servicePackages.find((p) => p.id === apt.servicePackageId);
+      if (!pkg) return;
+
+      const item: BillItem = {
+        id: `bi${Date.now()}-${aptId}`,
+        name: `${apt.servicePackageName} - ${new Date(apt.scheduledTime).toLocaleDateString('zh-CN')}`,
+        quantity: 1,
+        unitPrice: pkg.price,
+        amount: pkg.price,
+        subsidyAmount: pkg.price - pkg.subsidyPrice
+      };
+      items.push(item);
+      total += pkg.price;
+      subsidy += pkg.price - pkg.subsidyPrice;
     });
 
     return { total, subsidy, actual: total - subsidy, items };
   };
 
   const handleGenerateBill = () => {
-    if (!generateForm.elderlyId || !generateForm.month || generateForm.servicePackageIds.length === 0) return;
+    if (!generateForm.elderlyId || !generateForm.month || generateForm.selectedAppointmentIds.length === 0) return;
 
     const elder = elderly.find((e) => e.id === generateForm.elderlyId);
     if (!elder) return;
@@ -115,7 +128,7 @@ export default function Finance() {
 
     addBill(newBill);
     setShowGenerateModal(false);
-    setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), servicePackageIds: [] });
+    setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), selectedAppointmentIds: [] });
   };
 
   const handleDownload = (bill: Bill) => {
@@ -165,16 +178,24 @@ ${i + 1}. ${item.name}
     URL.revokeObjectURL(url);
   };
 
-  const toggleServicePackage = (pkgId: string) => {
+  const toggleAppointment = (aptId: string) => {
     setGenerateForm(prev => ({
       ...prev,
-      servicePackageIds: prev.servicePackageIds.includes(pkgId)
-        ? prev.servicePackageIds.filter(id => id !== pkgId)
-        : [...prev.servicePackageIds, pkgId]
+      selectedAppointmentIds: prev.selectedAppointmentIds.includes(aptId)
+        ? prev.selectedAppointmentIds.filter(id => id !== aptId)
+        : [...prev.selectedAppointmentIds, aptId]
     }));
   };
 
-  const preview = generateForm.servicePackageIds.length > 0 ? calculatePreview() : null;
+  const selectAllAppointments = () => {
+    if (generateForm.selectedAppointmentIds.length === filteredAppointments.length) {
+      setGenerateForm(prev => ({ ...prev, selectedAppointmentIds: [] }));
+    } else {
+      setGenerateForm(prev => ({ ...prev, selectedAppointmentIds: filteredAppointments.map(a => a.id) }));
+    }
+  };
+
+  const preview = generateForm.selectedAppointmentIds.length > 0 ? calculatePreview() : null;
 
   return (
     <div className="space-y-6">
@@ -244,24 +265,18 @@ ${i + 1}. ${item.name}
               className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
-          <div className="flex gap-3">
-            <div className="relative">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="appearance-none pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="all">全部状态</option>
-                <option value="unpaid">待支付</option>
-                <option value="paid">已支付</option>
-                <option value="subsidized">已补贴</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-            </div>
-            <button className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
-              <Filter className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">筛选</span>
-            </button>
+          <div className="relative">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="appearance-none pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">全部状态</option>
+              <option value="unpaid">待支付</option>
+              <option value="paid">已支付</option>
+              <option value="subsidized">已补贴</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
         </div>
 
@@ -442,7 +457,7 @@ ${i + 1}. ${item.name}
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">生成账单</h2>
                 <button
-                  onClick={() => { setShowGenerateModal(false); setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), servicePackageIds: [] }); }}
+                  onClick={() => { setShowGenerateModal(false); setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), selectedAppointmentIds: [] }); }}
                   className="p-2 hover:bg-white/20 rounded-xl transition-colors"
                 >
                   <X className="w-6 h-6" />
@@ -455,7 +470,7 @@ ${i + 1}. ${item.name}
                   <label className="block text-sm font-medium text-gray-700 mb-2">选择老人</label>
                   <select
                     value={generateForm.elderlyId}
-                    onChange={(e) => setGenerateForm({ ...generateForm, elderlyId: e.target.value })}
+                    onChange={(e) => setGenerateForm({ ...generateForm, elderlyId: e.target.value, selectedAppointmentIds: [] })}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   >
                     <option value="">请选择老人</option>
@@ -469,44 +484,82 @@ ${i + 1}. ${item.name}
                   <input
                     type="month"
                     value={generateForm.month}
-                    onChange={(e) => setGenerateForm({ ...generateForm, month: e.target.value })}
+                    onChange={(e) => setGenerateForm({ ...generateForm, month: e.target.value, selectedAppointmentIds: [] })}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">选择服务项目</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {servicePackages.map((pkg) => (
-                    <div
-                      key={pkg.id}
-                      onClick={() => toggleServicePackage(pkg.id)}
-                      className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${
-                        generateForm.servicePackageIds.includes(pkg.id)
-                          ? 'border-teal-500 bg-teal-50'
-                          : 'border-gray-100 hover:border-teal-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-gray-800">{pkg.name}</p>
-                          <p className="text-xs text-gray-500 mt-1">{pkg.duration}</p>
-                        </div>
-                        {generateForm.servicePackageIds.includes(pkg.id) && (
-                          <div className="w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-lg font-bold text-teal-600">¥{pkg.subsidyPrice}</span>
-                        <span className="text-xs text-gray-400 line-through">¥{pkg.price}</span>
-                      </div>
+              {generateForm.elderlyId && generateForm.month && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-700">选择服务记录</label>
+                    {filteredAppointments.length > 0 && (
+                      <button
+                        onClick={selectAllAppointments}
+                        className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+                      >
+                        {generateForm.selectedAppointmentIds.length === filteredAppointments.length ? '取消全选' : '全选'}
+                      </button>
+                    )}
+                  </div>
+                  
+                  {filteredAppointments.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-xl">
+                      <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500">该月份暂无已完成或已确认的服务记录</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {filteredAppointments.map((apt) => {
+                        const pkg = servicePackages.find((p) => p.id === apt.servicePackageId);
+                        const isSelected = generateForm.selectedAppointmentIds.includes(apt.id);
+                        return (
+                          <div
+                            key={apt.id}
+                            onClick={() => toggleAppointment(apt.id)}
+                            className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                              isSelected
+                                ? 'border-teal-500 bg-teal-50'
+                                : 'border-gray-100 hover:border-teal-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start gap-3">
+                                <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                  isSelected ? 'bg-teal-500' : 'border-2 border-gray-300'
+                                }`}>
+                                  {isSelected && <Check className="w-3 h-3 text-white" />}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-800">{apt.servicePackageName}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    预约时间：{new Date(apt.scheduledTime).toLocaleString('zh-CN')}
+                                  </p>
+                                  {apt.careWorkerName && (
+                                    <p className="text-xs text-gray-500">护理员：{apt.careWorkerName}</p>
+                                  )}
+                                  <p className={`text-xs mt-1 ${
+                                    apt.status === 'completed' ? 'text-green-600' : 'text-blue-600'
+                                  }`}>
+                                    状态：{apt.status === 'completed' ? '已完成' : '已确认'}
+                                  </p>
+                                </div>
+                              </div>
+                              {pkg && (
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-teal-600">¥{pkg.subsidyPrice}</p>
+                                  <p className="text-xs text-gray-400 line-through">¥{pkg.price}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {preview && (
                 <div className="bg-gray-50 rounded-xl p-5">
@@ -530,14 +583,14 @@ ${i + 1}. ${item.name}
             </div>
             <div className="flex gap-3 p-6 border-t border-gray-100">
               <button
-                onClick={() => { setShowGenerateModal(false); setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), servicePackageIds: [] }); }}
+                onClick={() => { setShowGenerateModal(false); setGenerateForm({ elderlyId: '', month: new Date().toISOString().slice(0, 7), selectedAppointmentIds: [] }); }}
                 className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
               >
                 取消
               </button>
               <button
                 onClick={handleGenerateBill}
-                disabled={!generateForm.elderlyId || !generateForm.month || generateForm.servicePackageIds.length === 0}
+                disabled={!generateForm.elderlyId || !generateForm.month || generateForm.selectedAppointmentIds.length === 0}
                 className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 <Plus className="w-5 h-5" />

@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
 import {
   Users,
@@ -29,6 +30,7 @@ const statCards = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { dashboardStats, elderly, tasks, messages } = useStore();
 
   const upcomingBirthdays = elderly.filter((e) => {
@@ -139,7 +141,10 @@ export default function Dashboard() {
               <Cake className="w-5 h-5 text-orange-500" />
               近期生日
             </h2>
-            <button className="text-teal-600 text-sm hover:underline flex items-center gap-1">
+            <button
+              onClick={() => navigate('/elderly')}
+              className="text-teal-600 text-sm hover:underline flex items-center gap-1"
+            >
               全部 <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -177,7 +182,10 @@ export default function Dashboard() {
               <Activity className="w-5 h-5 text-teal-500" />
               最新任务
             </h2>
-            <button className="text-teal-600 text-sm hover:underline flex items-center gap-1">
+            <button
+              onClick={() => navigate('/tasks')}
+              className="text-teal-600 text-sm hover:underline flex items-center gap-1"
+            >
               全部 <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -209,7 +217,10 @@ export default function Dashboard() {
               <AlertTriangle className="w-5 h-5 text-red-500" />
               风险提醒
             </h2>
-            <button className="text-teal-600 text-sm hover:underline flex items-center gap-1">
+            <button
+              onClick={() => navigate('/messages')}
+              className="text-teal-600 text-sm hover:underline flex items-center gap-1"
+            >
               全部 <ChevronRight className="w-4 h-4" />
             </button>
           </div>

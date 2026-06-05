@@ -3,7 +3,6 @@ import { useStore } from '@/store/useStore';
 import {
   Heart,
   Search,
-  Filter,
   ChevronDown,
   Plus,
   X,

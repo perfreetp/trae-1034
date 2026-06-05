@@ -9,7 +9,6 @@ import {
   XCircle,
   Camera,
   Navigation,
-  Filter,
   ChevronDown,
   Search,
   Phone,
@@ -105,10 +104,6 @@ export default function Tasks() {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
-            <button className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
-              <Filter className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">筛选</span>
-            </button>
           </div>
         </div>
 

@@ -4,7 +4,6 @@ import {
   Users,
   Search,
   Plus,
-  Filter,
   ChevronDown,
   Heart,
   AlertTriangle,
@@ -24,8 +23,23 @@ import type { Elderly, EmergencyContact, FamilyMember } from '@/types';
 const chronicDiseaseOptions = ['高血压', '糖尿病', '冠心病', '关节炎', '高血脂', '阿尔茨海默症', '前列腺增生'];
 const riskTagOptions = ['独居', '跌倒风险', '失能', '需要24小时护理', '认知障碍', '走失风险'];
 
+const maskPhone = (phone: string): string => {
+  if (!phone || phone.length < 7) return phone;
+  return phone.slice(0, 3) + '****' + phone.slice(-4);
+};
+
+const maskIdCard = (idCard: string): string => {
+  if (!idCard || idCard.length < 8) return idCard;
+  return idCard.slice(0, 6) + '********' + idCard.slice(-4);
+};
+
+const maskAddress = (address: string): string => {
+  if (!address || address.length < 6) return address;
+  return address.slice(0, 6) + '****';
+};
+
 export default function ElderlyPage() {
-  const { elderly, setSelectedElderly, selectedElderly, addElderly, updateElderly, deleteElderly, currentRole } = useStore();
+  const { elderly, setSelectedElderly, selectedElderly, addElderly, updateElderly, deleteElderly, currentRole, currentFamily } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState<string>('all');
   const [showDetail, setShowDetail] = useState(false);
@@ -58,9 +72,13 @@ export default function ElderlyPage() {
   });
 
   const filteredElderly = elderly.filter((e) => {
+    let matchRole = true;
+    if (currentRole === 'family' && currentFamily) {
+      matchRole = currentFamily.authorizedElderlyIds.includes(e.id);
+    }
     const matchSearch = e.name.includes(searchQuery) || e.idCard.includes(searchQuery) || e.phone.includes(searchQuery);
     const matchLevel = filterLevel === 'all' || e.abilityLevel === filterLevel;
-    return matchSearch && matchLevel;
+    return matchRole && matchSearch && matchLevel;
   });
 
   const getAbilityLevelText = (level: string) => {
@@ -196,6 +214,11 @@ export default function ElderlyPage() {
   };
 
   const canManage = currentRole === 'admin';
+  const isFamily = currentRole === 'family';
+
+  const displayPhone = (phone: string) => isFamily ? maskPhone(phone) : phone;
+  const displayIdCard = (idCard: string) => isFamily ? maskIdCard(idCard) : idCard;
+  const displayAddress = (address: string) => isFamily ? maskAddress(address) : address;
 
   return (
     <div className="space-y-6">
@@ -241,10 +264,6 @@ export default function ElderlyPage() {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
-            <button className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
-              <Filter className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">筛选</span>
-            </button>
           </div>
         </div>
       </div>
@@ -277,7 +296,7 @@ export default function ElderlyPage() {
                   <p className="text-sm text-gray-500 mt-0.5">{e.gender === 'female' ? '女' : '男'} · {e.age}岁</p>
                   <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
                     <Phone className="w-3 h-3" />
-                    <span>{e.phone}</span>
+                    <span>{displayPhone(e.phone)}</span>
                   </div>
                 </div>
               </div>
@@ -338,6 +357,15 @@ export default function ElderlyPage() {
         })}
       </div>
 
+      {filteredElderly.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-2xl">
+          <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">
+            {isFamily ? '暂无已授权的老人档案' : '暂无老人档案数据'}
+          </p>
+        </div>
+      )}
+
       {showDetail && selectedElderly && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl">
@@ -375,11 +403,11 @@ export default function ElderlyPage() {
                   <div className="space-y-3 bg-gray-50 rounded-xl p-4">
                     <div className="flex items-center gap-3">
                       <Phone className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{selectedElderly.phone}</span>
+                      <span className="text-sm text-gray-600">{displayPhone(selectedElderly.phone)}</span>
                     </div>
                     <div className="flex items-start gap-3">
                       <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-                      <span className="text-sm text-gray-600">{selectedElderly.address}</span>
+                      <span className="text-sm text-gray-600">{displayAddress(selectedElderly.address)}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <Calendar className="w-4 h-4 text-gray-400" />
@@ -387,7 +415,7 @@ export default function ElderlyPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <FileText className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">身份证：{selectedElderly.idCard}</span>
+                      <span className="text-sm text-gray-600">身份证：{displayIdCard(selectedElderly.idCard)}</span>
                     </div>
                   </div>
                 </div>
@@ -442,12 +470,14 @@ export default function ElderlyPage() {
                             {c.name}
                             {c.isPrimary && <span className="ml-2 text-xs text-teal-600 bg-teal-50 px-2 py-0.5 rounded">主要联系人</span>}
                           </p>
-                          <p className="text-sm text-gray-500">{c.relationship} · {c.phone}</p>
+                          <p className="text-sm text-gray-500">{c.relationship} · {displayPhone(c.phone)}</p>
                         </div>
                       </div>
-                      <a href={`tel:${c.phone}`} className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg">
-                        <Phone className="w-5 h-5" />
-                      </a>
+                      {!isFamily && (
+                        <a href={`tel:${c.phone}`} className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg">
+                          <Phone className="w-5 h-5" />
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -464,7 +494,7 @@ export default function ElderlyPage() {
                         </div>
                         <div>
                           <p className="font-medium text-gray-800">{f.name}</p>
-                          <p className="text-sm text-gray-500">{f.relationship} · {f.phone}</p>
+                          <p className="text-sm text-gray-500">{f.relationship} · {displayPhone(f.phone)}</p>
                         </div>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-medium ${

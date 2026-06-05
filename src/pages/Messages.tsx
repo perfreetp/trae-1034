@@ -3,7 +3,6 @@ import { useStore } from '@/store/useStore';
 import {
   MessageSquare,
   Search,
-  Filter,
   ChevronDown,
   Bell,
   AlertTriangle,
@@ -11,7 +10,9 @@ import {
   X,
   Check,
   Clock,
-  Star
+  Star,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import type { Message } from '@/types';
 
@@ -103,25 +104,19 @@ export default function Messages() {
               className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
-          <div className="flex gap-3">
-            <div className="relative">
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="appearance-none pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="all">全部类型</option>
-                <option value="service">服务通知</option>
-                <option value="emergency">紧急提醒</option>
-                <option value="system">系统消息</option>
-                <option value="survey">满意度调查</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-            </div>
-            <button className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
-              <Filter className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">筛选</span>
-            </button>
+          <div className="relative">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="appearance-none pl-4 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">全部类型</option>
+              <option value="service">服务通知</option>
+              <option value="emergency">紧急提醒</option>
+              <option value="system">系统消息</option>
+              <option value="survey">满意度调查</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
         </div>
 
@@ -149,8 +144,16 @@ export default function Messages() {
                         <h3 className={`font-semibold truncate ${!message.isRead ? 'text-gray-900' : 'text-gray-700'}`}>
                           {message.title}
                         </h3>
-                        {!message.isRead && (
-                          <span className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0" />
+                        {!message.isRead ? (
+                          <span className="flex items-center gap-1 px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium flex-shrink-0">
+                            <EyeOff className="w-3 h-3" />
+                            未读
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium flex-shrink-0">
+                            <Eye className="w-3 h-3" />
+                            已读
+                          </span>
                         )}
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${typeInfo.color}`}>
@@ -192,9 +195,15 @@ export default function Messages() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold">{selectedMessage.title}</h2>
-                  <p className="text-teal-100 mt-1">
-                    {new Date(selectedMessage.createTime).toLocaleString('zh-CN')}
-                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-teal-100">
+                      {new Date(selectedMessage.createTime).toLocaleString('zh-CN')}
+                    </p>
+                    <span className="flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                      <Check className="w-3 h-3" />
+                      已读
+                    </span>
+                  </div>
                 </div>
                 <button onClick={() => setShowDetail(false)} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
                   <X className="w-6 h-6" />
