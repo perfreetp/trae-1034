@@ -17,7 +17,7 @@ import {
 import type { Message } from '@/types';
 
 export default function Messages() {
-  const { messages, currentRole, currentFamily, currentWorker, markMessageRead, addMessage, elderly } = useStore();
+  const { messages, currentRole, currentFamily, currentWorker, markMessageRead, addMessage, elderly, tasks, appointments, healthRecords } = useStore();
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -25,16 +25,44 @@ export default function Messages() {
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [replyContent, setReplyContent] = useState('');
 
+  const getElderlyIdFromRelatedId = (relatedId?: string): string | null => {
+    if (!relatedId) return null;
+    if (relatedId.startsWith('t')) {
+      const task = tasks.find(t => t.id === relatedId);
+      return task?.elderlyId || null;
+    }
+    if (relatedId.startsWith('a')) {
+      const appt = appointments.find(a => a.id === relatedId);
+      return appt?.elderlyId || null;
+    }
+    if (relatedId.startsWith('h')) {
+      const record = healthRecords.find(r => r.id === relatedId);
+      return record?.elderlyId || null;
+    }
+    return null;
+  };
+
   const filteredMessages = messages.filter((msg) => {
     let matchRole = true;
+    let matchType = true;
+    let matchElderly = true;
+
     if (currentRole === 'family' && currentFamily) {
       matchRole = msg.recipientId === currentFamily.id;
+      matchType = ['service', 'emergency', 'survey'].includes(msg.type);
+      const elderlyId = getElderlyIdFromRelatedId(msg.relatedId);
+      if (elderlyId) {
+        matchElderly = currentFamily.authorizedElderlyIds.includes(elderlyId);
+      }
     } else if (currentRole === 'worker' && currentWorker) {
       matchRole = msg.recipientId === currentWorker.id;
+      matchType = filterType === 'all' || msg.type === filterType;
+    } else {
+      matchType = filterType === 'all' || msg.type === filterType;
     }
+
     const matchSearch = msg.title.includes(searchQuery) || msg.content.includes(searchQuery);
-    const matchType = filterType === 'all' || msg.type === filterType;
-    return matchRole && matchSearch && matchType;
+    return matchRole && matchType && matchElderly && matchSearch;
   }).sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime());
 
   const unreadCount = filteredMessages.filter((m) => !m.isRead).length;

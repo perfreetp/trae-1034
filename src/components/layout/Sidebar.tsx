@@ -9,7 +9,8 @@ import {
   Wallet,
   MessageSquare,
   Menu,
-  X
+  X,
+  Star
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
@@ -24,7 +25,8 @@ const allNavItems = [
   { path: '/health', label: '健康记录', icon: Heart, roles: ['admin', 'worker'] as Role[] },
   { path: '/contacts', label: '紧急联系人', icon: Phone, roles: ['admin'] as Role[] },
   { path: '/finance', label: '费用补贴', icon: Wallet, roles: ['admin', 'family'] as Role[] },
-  { path: '/messages', label: '家属消息', icon: MessageSquare, roles: ['admin', 'family'] as Role[] }
+  { path: '/messages', label: '家属消息', icon: MessageSquare, roles: ['admin', 'family'] as Role[] },
+  { path: '/survey', label: '满意度回访', icon: Star, roles: ['admin', 'family'] as Role[] }
 ];
 
 export function Sidebar() {

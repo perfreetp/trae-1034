@@ -9,6 +9,7 @@ import Health from "@/pages/Health";
 import Contacts from "@/pages/Contacts";
 import Finance from "@/pages/Finance";
 import Messages from "@/pages/Messages";
+import Survey from "@/pages/Survey";
 
 export default function App() {
   return (
@@ -53,6 +54,11 @@ export default function App() {
           <Route path="/messages" element={
             <ProtectedRoute allowedRoles={['admin', 'family']}>
               <Messages />
+            </ProtectedRoute>
+          } />
+          <Route path="/survey" element={
+            <ProtectedRoute allowedRoles={['admin', 'family']}>
+              <Survey />
             </ProtectedRoute>
           } />
         </Route>

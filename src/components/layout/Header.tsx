@@ -4,7 +4,18 @@ import { useState } from 'react';
 
 export function Header() {
   const { messages, currentRole, careWorkers, currentWorker, currentFamily, setCurrentRole, setCurrentWorker } = useStore();
-  const unreadCount = messages.filter((m) => !m.isRead).length;
+  const unreadCount = messages.filter((m) => {
+    if (!m.isRead) {
+      if (currentRole === 'family') {
+        return m.recipientId === currentFamily?.id;
+      } else if (currentRole === 'worker') {
+        return m.recipientId === currentWorker?.id;
+      } else {
+        return true;
+      }
+    }
+    return false;
+  }).length;
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [workerDropdownOpen, setWorkerDropdownOpen] = useState(false);
 

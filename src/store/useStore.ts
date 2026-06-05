@@ -11,7 +11,8 @@ import type {
   Bill,
   Message,
   DashboardStats,
-  EmergencyContact
+  EmergencyContact,
+  Survey
 } from '@/types';
 import {
   mockElderly,
@@ -37,6 +38,7 @@ interface StoreState {
   bills: Bill[];
   messages: Message[];
   dashboardStats: DashboardStats;
+  surveys: Survey[];
   currentRole: 'admin' | 'worker' | 'family';
   currentUserId: string;
   currentWorker: CareWorker | null;
@@ -46,6 +48,7 @@ interface StoreState {
   setCurrentWorker: (worker: CareWorker | null) => void;
   setCurrentUserId: (id: string) => void;
   setSelectedElderly: (elderly: Elderly | null) => void;
+  addSurvey: (survey: Survey) => void;
   addElderly: (elderly: Elderly) => void;
   updateElderly: (id: string, data: Partial<Elderly>) => void;
   deleteElderly: (id: string) => void;
@@ -73,6 +76,7 @@ const initialState = {
   medications: mockMedications,
   bills: mockBills,
   messages: mockMessages,
+  surveys: [] as Survey[],
   dashboardStats: mockDashboardStats,
   currentRole: 'admin' as const,
   currentUserId: 'admin001',
@@ -109,6 +113,11 @@ export const useStore = create<StoreState>()(
       },
       setCurrentUserId: (id) => set({ currentUserId: id }),
       setSelectedElderly: (elderly) => set({ selectedElderly: elderly }),
+      
+      addSurvey: (survey) =>
+        set((state) => ({
+          surveys: [...state.surveys, survey]
+        })),
       
       addElderly: (elderly) =>
         set((state) => ({

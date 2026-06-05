@@ -71,15 +71,8 @@ export default function ElderlyPage() {
     isPrimary: false
   });
 
-  const filteredElderly = elderly.filter((e) => {
-    let matchRole = true;
-    if (currentRole === 'family' && currentFamily) {
-      matchRole = currentFamily.authorizedElderlyIds.includes(e.id);
-    }
-    const matchSearch = e.name.includes(searchQuery) || e.idCard.includes(searchQuery) || e.phone.includes(searchQuery);
-    const matchLevel = filterLevel === 'all' || e.abilityLevel === filterLevel;
-    return matchRole && matchSearch && matchLevel;
-  });
+  const canManage = currentRole === 'admin';
+  const isFamily = currentRole === 'family';
 
   const getAbilityLevelText = (level: string) => {
     switch (level) {
@@ -89,6 +82,31 @@ export default function ElderlyPage() {
       default: return { text: '未知', color: 'bg-gray-100 text-gray-700' };
     }
   };
+
+  const filteredElderly = elderly.filter((e) => {
+    let matchRole = true;
+    if (currentRole === 'family' && currentFamily) {
+      matchRole = currentFamily.authorizedElderlyIds.includes(e.id);
+    }
+
+    let matchSearch = false;
+    if (currentRole === 'family') {
+      const abilityLevelText = getAbilityLevelText(e.abilityLevel).text;
+      matchSearch = e.name.includes(searchQuery) ||
+        (e.gender === 'male' ? '男' : '女').includes(searchQuery) ||
+        String(e.age).includes(searchQuery) ||
+        abilityLevelText.includes(searchQuery) ||
+        e.abilityLevel.includes(searchQuery);
+    } else {
+      matchSearch = e.name.includes(searchQuery) ||
+        e.idCard.includes(searchQuery) ||
+        e.phone.includes(searchQuery) ||
+        e.address.includes(searchQuery);
+    }
+
+    const matchLevel = filterLevel === 'all' || e.abilityLevel === filterLevel;
+    return matchRole && matchSearch && matchLevel;
+  });
 
   const openDetail = (e: Elderly) => {
     setSelectedElderly(e);
@@ -213,9 +231,6 @@ export default function ElderlyPage() {
     setEditingId(null);
   };
 
-  const canManage = currentRole === 'admin';
-  const isFamily = currentRole === 'family';
-
   const displayPhone = (phone: string) => isFamily ? maskPhone(phone) : phone;
   const displayIdCard = (idCard: string) => isFamily ? maskIdCard(idCard) : idCard;
   const displayAddress = (address: string) => isFamily ? maskAddress(address) : address;
@@ -244,7 +259,7 @@ export default function ElderlyPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="搜索姓名、身份证号、电话..."
+              placeholder={isFamily ? "搜索姓名、性别、年龄、能力等级..." : "搜索姓名、身份证号、电话、地址..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
